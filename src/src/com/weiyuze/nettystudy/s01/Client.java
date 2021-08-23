@@ -1,13 +1,14 @@
 package com.weiyuze.nettystudy.s01;
 
 import io.netty.bootstrap.Bootstrap;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelFutureListener;
-import io.netty.channel.ChannelInitializer;
-import io.netty.channel.EventLoopGroup;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
+import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.util.ReferenceCountUtil;
+import io.netty.util.concurrent.EventExecutorGroup;
 
 public class Client {//Netty基于事件模型 只需处理事件发生后做什么处理
 
@@ -52,6 +53,9 @@ public class Client {//Netty基于事件模型 只需处理事件发生后做什
             //connected!
             //已经连接上 sync结束 future通知Listener 打印
 
+            //需要阻塞住 等待服务端写回的数据
+            f.channel().closeFuture().sync();//接收到客户端ctx.close()后 继续执行 client端结束
+
         } finally {
             group.shutdownGracefully();//结束
         }
@@ -65,6 +69,42 @@ class ClientChannelInitializer extends ChannelInitializer<SocketChannel> {//Chan
     //初始化时 还没有连接 会被调用
     @Override
     protected void initChannel(SocketChannel ch) throws Exception {
-        System.out.println(ch);
+        //System.out.println(ch);
+
+        ch.pipeline().addLast(new ClientHandler());
+    }
+
+}
+
+class ClientHandler extends ChannelInboundHandlerAdapter {
+    @Override
+    public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+        ByteBuf buf = null;
+        try {
+            buf = (ByteBuf) msg;
+            byte[] bytes = new byte[buf.readableBytes()];
+            buf.getBytes(buf.readerIndex(), bytes);
+            System.out.println(new String(bytes));
+        } finally {
+            if (buf != null) ReferenceCountUtil.release(buf);
+        }
+    }
+
+    @Override
+    public void channelActive(ChannelHandlerContext ctx) throws Exception {
+        //channel 第一次连上可用 ，写出一个字符串
+        //网络上都是字节流 byte流 010101
+        //任何东西放到网上往外写 需要转成字节数组
+
+        //工具类 将Java里的字节数组 转为ByteBuf
+        //Netty写任何数据 最终都是由ByteBuf写出
+        //效率高 Java虚拟机管理自己内存，运行在操作系统上，操作系统管理更大内存，
+        //一个网络数据先写给操作系统，Java虚拟机想要用(读写)需要将其拷贝到虚拟机的内存里
+        //ByteBuf直接访问操作系统内存（跳过Java垃圾回收机制，用的内存越来越多，占用系统内存 需要释放） Direct Memory
+        //buf 指向直接内存 操作系统内存 需要释放 (虚拟机内存不用管是否释放 垃圾收集器处理)
+        ByteBuf buf = Unpooled.copiedBuffer("hello".getBytes());//传字节数组 写中文需要指定字符集
+        ctx.writeAndFlush(buf);//自动释放
+
+
     }
 }
