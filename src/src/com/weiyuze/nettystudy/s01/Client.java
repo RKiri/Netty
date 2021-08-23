@@ -105,6 +105,5 @@ class ClientHandler extends ChannelInboundHandlerAdapter {
         ByteBuf buf = Unpooled.copiedBuffer("hello".getBytes());//传字节数组 写中文需要指定字符集
         ctx.writeAndFlush(buf);//自动释放
 
-
     }
 }

@@ -81,7 +81,7 @@ class ServerChildHandler extends ChannelInboundHandlerAdapter { //SimpleChannleI
             buf = (ByteBuf) msg;
 
             byte[] bytes = new byte[buf.readableBytes()];//readableBytes有多少个(可以读的)字节
-            buf.getBytes(buf.readerIndex(),bytes);//从可以读的指针位置开始 把数据读满 读到整个字节数组里
+            buf.getBytes(buf.readerIndex(), bytes);//从可以读的指针位置开始 把数据读满 读到整个字节数组里
             System.out.println(new String(bytes));
             Server.clients.writeAndFlush(msg);//将通道组里每一个通道拿来往外写数据
 
